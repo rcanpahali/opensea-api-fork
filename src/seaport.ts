@@ -60,7 +60,6 @@ import {
   WrappedNFTLiquidationProxy,
 } from "./contracts";
 import {
-  MAX_ERROR_LENGTH,
   requireOrderCalldataCanMatch,
   requireOrdersCanMatch,
 } from "./debugging";
@@ -685,7 +684,7 @@ export class OpenSeaPort {
     // NOTE not in Wyvern exchange code:
     // frontend checks to make sure
     // token is approved and sufficiently available
-    await this._buyOrderValidationAndApprovals({ order, accountAddress });
+    // await this._buyOrderValidationAndApprovals({ order, accountAddress });
 
     const hashedOrder = {
       ...order,
@@ -758,7 +757,7 @@ export class OpenSeaPort {
     // NOTE not in Wyvern exchange code:
     // frontend checks to make sure
     // token is approved and sufficiently available
-    await this._buyOrderValidationAndApprovals({ order, accountAddress });
+    // await this._buyOrderValidationAndApprovals({ order, accountAddress });
 
     const hashedOrder = {
       ...order,
@@ -844,7 +843,7 @@ export class OpenSeaPort {
       buyerAddress: buyerAddress || NULL_ADDRESS,
     });
 
-    await this._sellOrderValidationAndApprovals({ order, accountAddress });
+    // await this._sellOrderValidationAndApprovals({ order, accountAddress });
 
     if (buyerEmail) {
       await this._createEmailWhitelistEntry({ order, buyerEmail });
@@ -935,23 +934,23 @@ export class OpenSeaPort {
     }
 
     // Validate just a single dummy order but don't post it
-    const dummyOrder = await this._makeSellOrder({
-      asset: assets[0],
-      quantity,
-      accountAddress,
-      startAmount,
-      endAmount,
-      listingTime,
-      expirationTime,
-      waitForHighestBid,
-      paymentTokenAddress: paymentTokenAddress || NULL_ADDRESS,
-      extraBountyBasisPoints,
-      buyerAddress: buyerAddress || NULL_ADDRESS,
-    });
-    await this._sellOrderValidationAndApprovals({
-      order: dummyOrder,
-      accountAddress,
-    });
+    // const dummyOrder = await this._makeSellOrder({
+    //   asset: assets[0],
+    //   quantity,
+    //   accountAddress,
+    //   startAmount,
+    //   endAmount,
+    //   listingTime,
+    //   expirationTime,
+    //   waitForHighestBid,
+    //   paymentTokenAddress: paymentTokenAddress || NULL_ADDRESS,
+    //   extraBountyBasisPoints,
+    //   buyerAddress: buyerAddress || NULL_ADDRESS,
+    // });
+    // await this._sellOrderValidationAndApprovals({
+    //   order: dummyOrder,
+    //   accountAddress,
+    // });
 
     const _makeAndPostOneSellOrder = async (asset: Asset) => {
       const order = await this._makeSellOrder({
@@ -1103,7 +1102,7 @@ export class OpenSeaPort {
       buyerAddress: buyerAddress || NULL_ADDRESS,
     });
 
-    await this._sellOrderValidationAndApprovals({ order, accountAddress });
+    // await this._sellOrderValidationAndApprovals({ order, accountAddress });
 
     const hashedOrder = {
       ...order,
@@ -1154,23 +1153,14 @@ export class OpenSeaPort {
     const { buy, sell } = assignOrdersToSides(order, matchingOrder);
 
     const metadata = this._getMetadata(order, referrerAddress);
-    const transactionHash = await this._atomicMatch({
+    const object: any = await this._atomicMatch({
       buy,
       sell,
       accountAddress,
       metadata,
     });
 
-    await this._confirmTransaction(
-      transactionHash,
-      EventType.MatchOrders,
-      "Fulfilling order",
-      async () => {
-        const isOpen = await this._validateOrder(order);
-        return !isOpen;
-      }
-    );
-    return transactionHash;
+    return object;
   }
 
   /**
@@ -3934,40 +3924,40 @@ export class OpenSeaPort {
     metadata?: string;
   }) {
     let value;
-    let shouldValidateBuy = true;
-    let shouldValidateSell = true;
+    // let shouldValidateBuy = false;
+    // let shouldValidateSell = false;
 
-    if (sell.maker.toLowerCase() == accountAddress.toLowerCase()) {
-      // USER IS THE SELLER, only validate the buy order
-      await this._sellOrderValidationAndApprovals({
-        order: sell,
-        accountAddress,
-      });
-      shouldValidateSell = false;
-    } else if (buy.maker.toLowerCase() == accountAddress.toLowerCase()) {
-      // USER IS THE BUYER, only validate the sell order
-      await this._buyOrderValidationAndApprovals({
-        order: buy,
-        counterOrder: sell,
-        accountAddress,
-      });
-      shouldValidateBuy = false;
+    // if (sell.maker.toLowerCase() == accountAddress.toLowerCase()) {
+    //   // USER IS THE SELLER, only validate the buy order
+    //   await this._sellOrderValidationAndApprovals({
+    //     order: sell,
+    //     accountAddress,
+    //   });
+    //   shouldValidateSell = false;
+    // } else if (buy.maker.toLowerCase() == accountAddress.toLowerCase()) {
+    //   // USER IS THE BUYER, only validate the sell order
+    //   await this._buyOrderValidationAndApprovals({
+    //     order: buy,
+    //     counterOrder: sell,
+    //     accountAddress,
+    //   });
+    //   shouldValidateBuy = false;
 
-      // If using ETH to pay, set the value of the transaction to the current price
-      if (buy.paymentToken == NULL_ADDRESS) {
-        value = await this._getRequiredAmountForTakingSellOrder(sell);
-      }
-    } else {
-      // User is neither - matching service
+    //   // If using ETH to pay, set the value of the transaction to the current price
+    if (buy.paymentToken == NULL_ADDRESS) {
+      value = await this._getRequiredAmountForTakingSellOrder(sell);
     }
+    // } else {
+    //   // User is neither - matching service
+    // }
 
-    await this._validateMatch({
-      buy,
-      sell,
-      accountAddress,
-      shouldValidateBuy,
-      shouldValidateSell,
-    });
+    // await this._validateMatch({
+    //   buy,
+    //   sell,
+    //   accountAddress,
+    //   shouldValidateBuy,
+    //   shouldValidateSell,
+    // });
 
     this._dispatch(EventType.MatchOrders, {
       buy,
@@ -3976,7 +3966,6 @@ export class OpenSeaPort {
       matchMetadata: metadata,
     });
 
-    let txHash;
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const txnData: any = { from: accountAddress, value };
     const args: WyvernAtomicMatchParameters = [
@@ -4042,75 +4031,25 @@ export class OpenSeaPort {
       ],
     ];
 
-    // Estimate gas first
-    try {
-      // Typescript splat doesn't typecheck
-      const gasEstimate =
-        await this._wyvernProtocolReadOnly.wyvernExchange.atomicMatch_.estimateGasAsync(
-          args[0],
-          args[1],
-          args[2],
-          args[3],
-          args[4],
-          args[5],
-          args[6],
-          args[7],
-          args[8],
-          args[9],
-          args[10],
-          txnData
-        );
-
-      txnData.gas = this._correctGasAmount(gasEstimate);
-    } catch (error) {
-      console.error(`Failed atomic match with args: `, args, error);
-      throw new Error(
-        `Oops, the Ethereum network rejected this transaction :( The OpenSea devs have been alerted, but this problem is typically due an item being locked or untransferrable. The exact error was "${
-          error instanceof Error
-            ? error.message.substr(0, MAX_ERROR_LENGTH)
-            : "unknown"
-        }..."`
+    const encoded =
+      this._wyvernProtocolReadOnly.wyvernExchange.atomicMatch_.getABIEncodedTransactionData(
+        args[0],
+        args[1],
+        args[2],
+        args[3],
+        args[4],
+        args[5],
+        args[6],
+        args[7],
+        args[8],
+        args[9],
+        args[10]
       );
-    }
 
-    // Then do the transaction
-    try {
-      this.logger(`Fulfilling order with gas set to ${txnData.gas}`);
-      txHash =
-        await this._wyvernProtocol.wyvernExchange.atomicMatch_.sendTransactionAsync(
-          args[0],
-          args[1],
-          args[2],
-          args[3],
-          args[4],
-          args[5],
-          args[6],
-          args[7],
-          args[8],
-          args[9],
-          args[10],
-          txnData
-        );
-    } catch (error) {
-      console.error(error);
-
-      this._dispatch(EventType.TransactionDenied, {
-        error,
-        buy,
-        sell,
-        accountAddress,
-        matchMetadata: metadata,
-      });
-
-      throw new Error(
-        `Failed to authorize transaction: "${
-          error instanceof Error && error.message
-            ? error.message
-            : "user denied"
-        }..."`
-      );
-    }
-    return txHash;
+    return {
+      encoded,
+      txnData,
+    };
   }
 
   private async _getRequiredAmountForTakingSellOrder(sell: Order) {
