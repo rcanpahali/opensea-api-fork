@@ -1143,7 +1143,7 @@ export class OpenSeaPort {
     accountAddress: string;
     recipientAddress?: string;
     referrerAddress?: string;
-  }): Promise<string> {
+  }): Promise<object> {
     const matchingOrder = this._makeMatchingOrder({
       order,
       accountAddress,
